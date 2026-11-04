@@ -49,8 +49,7 @@ static volatile uint8_t g_reboot;
 static uint32_t g_ticks_per_ms;
 
 /**
- * \brief           Bring up the system clock: `HEXT` -> `PLL`, then let the BSP
- *                      compute the real `HCLK` into `system_core_clock`
+ * \brief           Bring up the system clock (`HEXT` -> `PLL`)
  */
 static void clock_config(void) {
     crm_reset();
@@ -151,8 +150,8 @@ static uint8_t commit_descriptor(void) {
 }
 
 /**
- * \brief           Load the boot descriptor from flash; reset it to the default
- *                      when its marker is invalid
+ * \brief           Read the boot descriptor from flash into RAM
+ * \note            Garbage (`magic != 0`) means no OTA pending.
  */
 static void load_descriptor(void) {
     mem_copy(&g_desc, (const void*)DESC_FLASH, sizeof(g_desc));
@@ -160,7 +159,6 @@ static void load_descriptor(void) {
         g_desc.magic = 0;
         g_desc.flag = 0;
         g_desc.length = 0;
-        commit_descriptor();
     }
 }
 
@@ -223,8 +221,7 @@ static uint8_t validate_slot(void) {
 }
 
 /**
- * \brief           Decide what to boot: commit a pending OTA when flagged, then
- *                      launch `slot 0`; request a reboot if nothing launches
+ * \brief           Commit a staged OTA if flagged, then launch `slot 0`
  */
 static void boot_decision(void) {
     if (!g_desc.flag) {
@@ -248,9 +245,8 @@ static void boot_decision(void) {
 
 /**
  * \brief           Prepare the `SysTick` millisecond busy-wait
- * \note            Run once after the clock is configured. Selects `HCLK`
- *                      (undivided) as the `SysTick` clock source - as the Artery
- *                      BSP `delay_init` does - and caches the per-ms tick count.
+ * \note            Run after `clock_config()`; selects `HCLK` as the `SysTick`
+ *                      source and caches ticks/ms.
  */
 static void delay_init(void) {
     systick_clock_source_config(SYSTICK_CLOCK_SOURCE_AHBCLK_NODIV);
@@ -260,9 +256,8 @@ static void delay_init(void) {
 /**
  * \brief           Busy-wait a number of milliseconds by polling `SysTick`
  * \param[in]       ms: delay duration, in milliseconds
- * \note            Split into `DELAY_STEP_MS` chunks so the reload value never
- *                      exceeds the 24-bit `SysTick` range. The clock source is
- *                      selected once in `delay_init()`; this only toggles enable.
+ * \note            Chunked by `DELAY_STEP_MS` to stay within the 24-bit `SysTick`
+ *                      reload.
  */
 static void delay_ms(uint32_t ms) {
     uint32_t chunk;
@@ -279,8 +274,7 @@ static void delay_ms(uint32_t ms) {
 }
 
 /**
- * \brief           Bootloader entry: configure clocks, boot the application, and
- *                      reset to retry when no valid application could be launched
+ * \brief           Bootloader entry; resets to retry if no application launches
  * \return          Never returns
  */
 int main(void) {
