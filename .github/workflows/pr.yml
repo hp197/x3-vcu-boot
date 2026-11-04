@@ -1,0 +1,48 @@
+name: PR Checks
+
+# On every pull request to main: verify code style (clang-format against the repo's
+# .clang-format) and that the firmware still compiles (PlatformIO build = syntax check).
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  style:
+    name: Style (clang-format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Install clang-format
+        run: pip install clang-format==23.1.5
+
+      - name: Check formatting
+        run: |
+          clang-format --version
+          # Our own sources only; the vendored Artery header include/at32f415_conf.h
+          # keeps vendor style and is not checked.
+          clang-format --dry-run --Werror src/*.c
+
+  build:
+    name: Syntax (PlatformIO build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Install PlatformIO
+        run: pip install "platformio~=6.0"
+
+      - name: Build
+        run: pio run
